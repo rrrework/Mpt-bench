@@ -20,6 +20,12 @@ Thumbs.db
 # Python test scripts (not part of Node.js package)
 test/
 
+# Environment & Secrets
+.npmrc
+.env
+.env.*
+*.local
+
 # User workspace (local config with API keys)
 .mpt/
 
