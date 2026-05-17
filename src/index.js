@@ -24,14 +24,15 @@ ${t('menu_title')}
   -------- ${t('menu_section_test')} --------
   1. ${t('menu_1')}
   2. ${t('menu_2')}
+  3. ${t('menu_3')}
 
   -------- ${t('menu_section_config')} --------
-  3. ${t('menu_3')}
   4. ${t('menu_4')}
+  5. ${t('menu_5')}
 
   -------- ${t('menu_section_report')} --------
-  5. ${t('menu_5')}
   6. ${t('menu_6')}
+  7. ${t('menu_7')}
 
   ------------ ${t('menu_section_tools')} ------------
   0. ${t('menu_0')}
@@ -279,6 +280,35 @@ async function modelBenchmark() {
 }
 
 /**
+ * 工具调用测试交互入口
+ */
+async function toolTestMenu() {
+  const configPath = getConfigPath();
+  const config = loadConfig(configPath);
+  const channels = config.channels || [];
+  if (channels.length === 0) { console.log(chalk.yellow('没有可用渠道')); return; }
+  const channelName = channels.length === 1 ? channels[0].name : (await prompts({
+    type: 'select', name: 'ch', message: '选择渠道',
+    choices: channels.map(c => ({ title: c.name, value: c.name })),
+  })).ch;
+  if (!channelName) return;
+  const cfg = await prompts([
+    { type: 'select', name: 'mode', message: '测试模式', choices: [
+      { title: 'All (全部)', value: 'all' },
+      { title: 'Simple (简单验证)', value: 'simple' },
+      { title: 'Multi (多场景)', value: 'multi' },
+      { title: 'Boundary (边界测试)', value: 'boundary' },
+    ]},
+    { type: 'number', name: 'simpleIters', message: '简单验证迭代次数', initial: 5 },
+    { type: 'number', name: 'multiIters', message: '多场景迭代次数', initial: 5 },
+    { type: 'number', name: 'boundaryIters', message: '边界测试迭代次数', initial: 5 },
+  ]);
+  if (!cfg.mode) return;
+  const { toolTestCommand } = await import('./cli/tooltest.js');
+  await toolTestCommand({ channel: channelName, mode: cfg.mode, simpleIters: cfg.simpleIters, multiIters: cfg.multiIters, boundaryIters: cfg.boundaryIters, config: configPath });
+}
+
+/**
  * 一键引导压测
  */
 async function guidedTest() {
@@ -504,7 +534,7 @@ export async function showMenu(options) {
     type: 'text',
     name: 'choice',
     message: t('prompt_menu'),
-    validate: value => /^[0-6qQ]$/.test(value) ? true : t('prompt_invalid'),
+    validate: value => /^[0-7qQ]$/.test(value) ? true : t('prompt_invalid'),
   }, {
     onCancel: () => {
       console.log(chalk.cyan('\nBye! / 再见！'));
@@ -526,8 +556,6 @@ export async function showMenu(options) {
   const configPath = getConfigPath();
 
   try {
-    const { runCommand } = await import('./cli/run.js');
-    const { datasetGen, datasetImport } = await import('./cli/dataset.js');
     const { reportLatest, reportList } = await import('./cli/report.js');
 
     switch (choice) {
@@ -540,49 +568,46 @@ export async function showMenu(options) {
         await pause();
         break;
       case '3':
+        await toolTestMenu();
+        await pause();
+        break;
+      case '4':
         await channelManagement();
         break;
-      case '4': {
-        const { datasetGen, datasetImport } = await import('./cli/dataset.js');
+      case '5': {
         const ds = await prompts({
           type: 'select',
           name: 'action',
-          message: '数据集操作',
+          message: t('ds_menu_title'),
           choices: [
-            { title: '生成数据集', value: 'gen' },
-            { title: '导入数据集', value: 'import' },
+            { title: t('ds_gen_option'), value: 'gen' },
+            { title: t('ds_import_option'), value: 'import' },
           ],
         });
         if (ds.action === 'gen') {
           const genOpts = await prompts([
-            { type: 'number', name: 'count', message: '生成条数', initial: 100 },
-            { type: 'number', name: 'sizeKb', message: '每条目标大小(KB)', initial: 10 },
+            { type: 'number', name: 'count', message: t('ds_gen_count'), initial: 100 },
+            { type: 'number', name: 'sizeKb', message: t('ds_gen_size'), initial: 10 },
           ]);
           if (genOpts.count) {
-            await datasetGen({
-              count: String(genOpts.count),
-              sizeKb: String(genOpts.sizeKb || 10),
-              output: 'default.json',
-            });
+            const { datasetGen } = await import('./cli/dataset.js');
+            await datasetGen({ count: String(genOpts.count), sizeKb: String(genOpts.sizeKb || 10), output: 'default.json' });
           }
         } else {
-          const filePath = await prompts({
-            type: 'text',
-            name: 'file',
-            message: '请输入要导入的文件路径',
-          });
+          const filePath = await prompts({ type: 'text', name: 'file', message: t('ds_import_file') });
           if (filePath.file) {
+            const { datasetImport } = await import('./cli/dataset.js');
             datasetImport({ file: filePath.file });
           }
         }
         await pause();
         break;
       }
-      case '5':
+      case '6':
         await reportOpenLatest();
         await pause();
         break;
-      case '6':
+      case '7':
         await reportBrowse();
         await pause();
         break;

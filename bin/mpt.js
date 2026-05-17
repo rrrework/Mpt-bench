@@ -223,6 +223,57 @@ program.command('models')
   });
 
 // ===================================================================
+// mpt tool-test — 工具调用正确性测试
+// ===================================================================
+program.command('tool-test')
+  .description('LLM 工具调用正确性测试 — 验证 tool_choice=required 时 tool_calls 返回率')
+  .option('--channel <name>', '渠道名称（必填）')
+  .option('-m, --model <id>', '覆盖渠道的模型ID')
+  .option('--mode <type>', '测试模式: simple | multi | boundary | all', 'all')
+  .option('--simple-iters <n>', '简单验证每个场景迭代次数', '5')
+  .option('--multi-iters <n>', '多场景验证每个场景迭代次数', '5')
+  .option('--boundary-iters <n>', '边界测试每个场景迭代次数', '5')
+  .option('--concurrency <n>', '最大并发数', '3')
+  .option('--single', '单请求调试模式：发送1个请求并打印完整 API 响应 JSON')
+  .addHelpText('after', `
+═══ 详细说明 ═══
+
+测试 LLM API 在 tool_choice="required" 设置下，是否能 100% 返回 tool_calls。
+
+3 种模式可分别设置迭代次数:
+  --simple-iters   简单验证迭代次数（计算器+天气，默认5）
+  --multi-iters    多场景迭代次数（7种业务场景，默认5）
+  --boundary-iters 边界测试迭代次数（8种极端场景，默认5）
+
+输出: HTML 报告 + JSON 详细结果 + 错误日志
+
+═══ 使用示例 ═══
+
+  # 快速验证
+  npx mpt tool-test --channel SHENYUAN --mode all
+
+  # 简单验证 100 次（对齐 Python 参考）
+  npx mpt tool-test --channel SHENYUAN --mode simple --simple-iters 100
+
+  # 全模式，不同迭代次数
+  npx mpt tool-test --channel SHENYUAN --mode all --simple-iters 50 --multi-iters 30 --boundary-iters 10
+
+  # 边界测试，指定模型
+  npx mpt tool-test --channel SHENYUAN --mode boundary --boundary-iters 20 --model t_wz_glm-5
+`)
+  .action(async (opts) => {
+    const { toolTestCommand } = await import('../src/cli/tooltest.js');
+    const { getConfigPath } = await import('../src/utils/workspace.js');
+    opts.config = program.opts().config || getConfigPath();
+    try {
+      await toolTestCommand(opts);
+    } catch (e) {
+      console.error(`错误: ${e.message}`);
+      process.exit(1);
+    }
+  });
+
+// ===================================================================
 // mpt channel — 渠道管理
 // ===================================================================
 const chCmd = program.command('channel')

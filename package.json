@@ -1,7 +1,7 @@
 {
-  "name": "mpt",
+  "name": "mpt-bench",
   "version": "1.0.0",
-  "description": "Model Performance Test - 多渠道 LLM 模型性能压测工具，对标 npx zcf 交互体验",
+  "description": "MPT - Multi-channel LLM stress testing tool (RPM/TTFT/TPS/P95). Supports OpenAI-compatible APIs, SSE streaming, adaptive scheduling, and multi-model benchmarking.",
   "type": "module",
   "main": "src/index.js",
   "bin": {
