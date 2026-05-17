@@ -1,0 +1,36 @@
+{
+  "name": "mpt",
+  "version": "1.0.0",
+  "description": "Model Performance Test - 多渠道 LLM 模型性能压测工具，对标 npx zcf 交互体验",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "mpt": "./bin/mpt.js"
+  },
+  "scripts": {
+    "start": "node bin/mpt.js",
+    "dev": "node --watch bin/mpt.js",
+    "run": "node bin/mpt.js run",
+    "test": "echo \"Tests pending\" && exit 0"
+  },
+  "keywords": [
+    "llm",
+    "stress-test",
+    "benchmark",
+    "performance",
+    "model-test",
+    "openai",
+    "channel"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "prompts": "^2.4.2",
+    "js-yaml": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

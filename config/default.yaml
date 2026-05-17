@@ -1,0 +1,62 @@
+# ============================================================
+# MPT (Model Performance Test) 默认配置文件
+# ============================================================
+# 可通过 --config 指定自定义配置文件路径
+# ============================================================
+
+# 全局默认参数
+defaults:
+  rpm: 60                    # 默认请求速率 (requests per minute)
+  duration: 120              # 默认持续时间 (秒)
+  max_concurrent: 1000       # 最大并发连接数
+  schedule_mode: adaptive    # 调度模式: adaptive / second / micro
+  second_threshold: 600      # RPM 低于此值用秒调度，否则微调度
+
+# 超时配置 (秒)
+timeout:
+  connect: 100               # 连接超时
+  read: 180                  # 读取超时
+  total: 300                 # 总超时
+
+# 请求默认参数
+request:
+  max_tokens: 2048           # 单请求最大输出 token
+  temperature: 0.7           # 温度参数
+  stream: true               # 是否启用流式 (SSE)
+
+# Token 估算 (当 API 不返回 usage 时使用)
+token_estimate:
+  enabled: true              # 是否启用估算
+  chars_per_token: 2         # 中文字符/token 比率 (粗略)
+  
+# 日志配置
+logging:
+  level: debug               # 日志级别: debug / info / warn / error
+  error_log: "{model}_error.log"
+  debug_log: "{model}_debug.log"
+
+# 报告配置
+report:
+  output_dir: "./results"    # 报告输出目录
+  template: "default"        # 报告模板
+  filename: "{model}_stress_test_report.html"
+
+# 待测渠道列表 (示例)
+channels:
+  - name: "glm-5.1"
+    base_url: "https://www.sophnet.com/api/open-apis/v1"
+    api_key: "YOUR_API_KEY_HERE"
+    model: "GLM-5.1"
+    enabled: true
+    
+  - name: "deepseek-v4"
+    base_url: "https://api.deepseek.com/v1"
+    api_key: "YOUR_API_KEY_HERE"
+    model: "deepseek-v4-pro"
+    enabled: false
+
+  - name: "kimi-k2"
+    base_url: "https://api.moonshot.cn/v1"
+    api_key: "YOUR_API_KEY_HERE"
+    model: "kimi-k2.6"
+    enabled: false
