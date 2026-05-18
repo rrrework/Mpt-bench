@@ -92,11 +92,7 @@ report:
   output_dir: "~/.mpt/results"
   filename: "{model}_stress_test_report.html"
 
-channels:
-  - name: "glm-5.1"
-    base_url: "https://www.sophnet.com/api/open-apis/v1"
-    api_key: "YOUR_API_KEY_HERE"
-    model: "GLM-5.1"
-    enabled: true
+# 默认不预置渠道，避免把本地示例渠道带到新机器
+channels: []
 `;
 }

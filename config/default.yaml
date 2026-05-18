@@ -41,22 +41,5 @@ report:
   template: "default"        # 报告模板
   filename: "{model}_stress_test_report.html"
 
-# 待测渠道列表 (示例)
-channels:
-  - name: "glm-5.1"
-    base_url: "https://www.sophnet.com/api/open-apis/v1"
-    api_key: "YOUR_API_KEY_HERE"
-    model: "GLM-5.1"
-    enabled: true
-    
-  - name: "deepseek-v4"
-    base_url: "https://api.deepseek.com/v1"
-    api_key: "YOUR_API_KEY_HERE"
-    model: "deepseek-v4-pro"
-    enabled: false
-
-  - name: "kimi-k2"
-    base_url: "https://api.moonshot.cn/v1"
-    api_key: "YOUR_API_KEY_HERE"
-    model: "kimi-k2.6"
-    enabled: false
+# 待测渠道列表（默认留空，首次使用请通过 `mpt channel add` 添加）
+channels: []
