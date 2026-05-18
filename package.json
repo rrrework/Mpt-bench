@@ -1,6 +1,6 @@
 {
   "name": "mpt-bench",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "MPT - Multi-channel LLM stress testing tool (RPM/TTFT/TPS/P95). Supports OpenAI-compatible APIs, SSE streaming, adaptive scheduling, and multi-model benchmarking.",
   "type": "module",
   "main": "src/index.js",
