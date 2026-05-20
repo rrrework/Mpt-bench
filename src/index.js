@@ -319,23 +319,60 @@ async function guidedTest() {
 
   console.log(chalk.cyan('\n=== 一键压测引导 ===\n'));
 
+  // Step 0: 选择场景
+  const scenarioChoice = await prompts({
+    type: 'select',
+    name: 'scenario',
+    message: '选择压测场景',
+    choices: [
+      { title: 'default（通用）', value: 'default' },
+      { title: 'short（短请求）', value: 'short' },
+      { title: 'long-summary（长综述）', value: 'long-summary' },
+    ],
+  });
+  if (!scenarioChoice.scenario) {
+    console.log(chalk.gray('已取消。'));
+    return;
+  }
+  const selectedScenario = scenarioChoice.scenario;
+  const datasetFile = selectedScenario === 'default' ? 'default.json' : `${selectedScenario}.json`;
+  const scenarioDataset = resolve(getDatasetsDir(), datasetFile);
+
   // Step 1: 检查数据集
-  const defaultDataset = getDefaultDatasetPath();
-  if (!existsSync(defaultDataset)) {
+  if (!existsSync(scenarioDataset)) {
     console.log(chalk.yellow('未找到测试数据集。'));
     const genChoice = await prompts({
       type: 'confirm',
       name: 'generate',
-      message: '是否自动生成测试数据集？（100条，每条10KB）',
+      message: `是否自动生成 ${selectedScenario} 场景数据集？`,
       initial: true,
     });
     if (!genChoice.generate) {
       console.log(chalk.gray('已取消。您可以通过菜单选项6手动生成数据集。'));
       return;
     }
-    await datasetGen({ count: '100', sizeKb: '10', output: 'default.json' });
+
+    let targetKb = 10;
+    let corpus;
+    if (selectedScenario === 'long-summary') {
+      const longOpts = await prompts([
+        { type: 'number', name: 'targetKb', message: 'long-summary 单条目标正文大小(KB)', initial: 64 },
+        { type: 'text', name: 'corpus', message: '语料文件路径（可选，默认内置）', initial: '' },
+      ]);
+      targetKb = longOpts.targetKb || 64;
+      corpus = longOpts.corpus || undefined;
+    }
+
+    await datasetGen({
+      preset: selectedScenario,
+      count: '100',
+      sizeKb: String(targetKb),
+      targetKb: String(targetKb),
+      corpus,
+      output: datasetFile,
+    });
   } else {
-    console.log(chalk.green(`数据集就绪: ${defaultDataset}`));
+    console.log(chalk.green(`数据集就绪: ${scenarioDataset}`));
   }
 
   // Step 2: 检查渠道
@@ -395,12 +432,14 @@ async function guidedTest() {
   if (!params.rpm || !params.duration) { console.log(chalk.gray('已取消。')); return; }
 
   // Step 4: 执行
-  console.log(chalk.cyan(`\n开始压测: ${selectedChannel} @ ${params.rpm} RPM, ${params.duration}s, 并发${params.concurrent || 50}\n`));
+  console.log(chalk.cyan(`\n开始压测: ${selectedChannel} @ ${params.rpm} RPM, ${params.duration}s, 并发${params.concurrent || 50}, 场景=${selectedScenario}\n`));
   await runCommand({
     channel: selectedChannel,
     rpm: params.rpm,
     duration: params.duration,
     concurrent: params.concurrent,
+    dataset: scenarioDataset,
+    scenario: selectedScenario,
     config: configPath,
   });
 }
@@ -585,13 +624,53 @@ export async function showMenu(options) {
           ],
         });
         if (ds.action === 'gen') {
+          const presetChoice = await prompts({
+            type: 'select',
+            name: 'preset',
+            message: '选择数据集预设',
+            choices: [
+              { title: 'default（通用）', value: 'default' },
+              { title: 'short（短请求）', value: 'short' },
+              { title: 'long-summary（长综述）', value: 'long-summary' },
+            ],
+          });
+          if (!presetChoice.preset) {
+            await pause();
+            break;
+          }
+
           const genOpts = await prompts([
             { type: 'number', name: 'count', message: t('ds_gen_count'), initial: 100 },
-            { type: 'number', name: 'sizeKb', message: t('ds_gen_size'), initial: 10 },
+            {
+              type: presetChoice.preset === 'long-summary' ? 'number' : null,
+              name: 'targetKb',
+              message: 'long-summary 单条目标正文大小(KB)',
+              initial: 64,
+            },
+            {
+              type: presetChoice.preset === 'long-summary' ? 'text' : null,
+              name: 'corpus',
+              message: '语料文件路径（可选，默认内置）',
+              initial: '',
+            },
+            {
+              type: 'text',
+              name: 'output',
+              message: '输出文件名',
+              initial: presetChoice.preset === 'default' ? 'default.json' : `${presetChoice.preset}.json`,
+            },
           ]);
           if (genOpts.count) {
             const { datasetGen } = await import('./cli/dataset.js');
-            await datasetGen({ count: String(genOpts.count), sizeKb: String(genOpts.sizeKb || 10), output: 'default.json' });
+            const targetKb = genOpts.targetKb || 10;
+            await datasetGen({
+              preset: presetChoice.preset,
+              count: String(genOpts.count),
+              sizeKb: String(targetKb),
+              targetKb: String(targetKb),
+              corpus: genOpts.corpus || undefined,
+              output: genOpts.output || (presetChoice.preset === 'default' ? 'default.json' : `${presetChoice.preset}.json`),
+            });
           }
         } else {
           const filePath = await prompts({ type: 'text', name: 'file', message: t('ds_import_file') });

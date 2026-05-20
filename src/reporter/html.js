@@ -36,11 +36,12 @@ export function generateHtmlReport(stats, options, outputPath) {
   const tokenTps = stats.getTokenTps();
   const maxTps = stats.getMaxTpsPerSecond();
 
-  let avgResp = 0, medResp = 0, p95Resp = 0, p99Resp = 0, maxResp = 0, minResp = 0, stdResp = 0;
+  let avgResp = 0, medResp = 0, p90Resp = 0, p95Resp = 0, p99Resp = 0, maxResp = 0, minResp = 0, stdResp = 0;
   if (stats.responseTimes.length > 0) {
     const arr = stats.responseTimes;
     avgResp = mean(arr) * 1000;
     medResp = median(arr) * 1000;
+    p90Resp = percentile(arr, 0.90) * 1000;
     p95Resp = percentile(arr, 0.95) * 1000;
     p99Resp = percentile(arr, 0.99) * 1000;
     maxResp = Math.max(...arr) * 1000;
@@ -48,14 +49,20 @@ export function generateHtmlReport(stats, options, outputPath) {
     stdResp = stdDev(arr) * 1000;
   }
 
-  let avgTtft = 0, medTtft = 0, p95Ttft = 0, p99Ttft = 0;
+  let avgTtft = 0, medTtft = 0, p90Ttft = 0, p95Ttft = 0, p99Ttft = 0;
   if (stats.ttftTimes.length > 0) {
     const arr = stats.ttftTimes;
     avgTtft = mean(arr) * 1000;
     medTtft = median(arr) * 1000;
+    p90Ttft = percentile(arr, 0.90) * 1000;
     p95Ttft = percentile(arr, 0.95) * 1000;
     p99Ttft = percentile(arr, 0.99) * 1000;
   }
+
+  const scenario = options?.scenario || 'N/A';
+  const datasetPath = options?.dataset?.path || 'N/A';
+  const datasetCount = options?.dataset?.count ?? 'N/A';
+  const datasetCorpus = options?.dataset?.corpus || 'N/A';
 
   // TPS 时序数据
   const tpsLabels = [];
@@ -116,7 +123,7 @@ th{background:#667eea;color:white}
 <div class="container">
 <div class="header">
   <h1>LLM 压力测试报告</h1>
-  <div>模型: ${options.modelName} | 目标: ${options.targetRpm} RPM | 时长: ${options.duration}s</div>
+  <div>模型: ${options.modelName} | 场景: ${scenario} | 目标: ${options.targetRpm} RPM | 时长: ${options.duration}s</div>
   <div class="timestamp">生成时间: ${new Date().toLocaleString('zh-CN')}</div>
 </div>
 <div class="summary-cards">
@@ -148,6 +155,7 @@ th{background:#667eea;color:white}
     <div>
       <div class="stat-item"><span class="stat-label">平均响应</span><span class="stat-value">${avgResp.toFixed(0)} ms</span></div>
       <div class="stat-item"><span class="stat-label">中位响应</span><span class="stat-value">${medResp.toFixed(0)} ms</span></div>
+      <div class="stat-item"><span class="stat-label">P90 响应</span><span class="stat-value">${p90Resp.toFixed(0)} ms</span></div>
       <div class="stat-item"><span class="stat-label">P95 响应</span><span class="stat-value">${p95Resp.toFixed(0)} ms</span></div>
       <div class="stat-item"><span class="stat-label">P99 响应</span><span class="stat-value">${p99Resp.toFixed(0)} ms</span></div>
       <div class="stat-item"><span class="stat-label">最大 / 最小</span><span class="stat-value">${maxResp.toFixed(0)} / ${minResp.toFixed(0)} ms</span></div>
@@ -156,6 +164,7 @@ th{background:#667eea;color:white}
     <div>
       <div class="stat-item"><span class="stat-label">平均 TTFT</span><span class="stat-value">${avgTtft.toFixed(0)} ms</span></div>
       <div class="stat-item"><span class="stat-label">中位 TTFT</span><span class="stat-value">${medTtft.toFixed(0)} ms</span></div>
+      <div class="stat-item"><span class="stat-label">P90 TTFT</span><span class="stat-value">${p90Ttft.toFixed(0)} ms</span></div>
       <div class="stat-item"><span class="stat-label">P95 TTFT</span><span class="stat-value">${p95Ttft.toFixed(0)} ms</span></div>
       <div class="stat-item"><span class="stat-label">P99 TTFT</span><span class="stat-value">${p99Ttft.toFixed(0)} ms</span></div>
     </div>
@@ -213,6 +222,10 @@ th{background:#667eea;color:white}
   <div class="stats-grid">
     <div>
       <div class="stat-item"><span class="stat-label">模型</span><span class="stat-value">${options.modelName}</span></div>
+      <div class="stat-item"><span class="stat-label">场景</span><span class="stat-value">${scenario}</span></div>
+      <div class="stat-item"><span class="stat-label">数据集</span><span class="stat-value">${datasetPath}</span></div>
+      <div class="stat-item"><span class="stat-label">数据集条数</span><span class="stat-value">${datasetCount}</span></div>
+      <div class="stat-item"><span class="stat-label">语料来源</span><span class="stat-value">${datasetCorpus}</span></div>
       <div class="stat-item"><span class="stat-label">目标 RPM</span><span class="stat-value">${options.targetRpm}</span></div>
       <div class="stat-item"><span class="stat-label">压测时长</span><span class="stat-value">${options.duration} 秒</span></div>
       <div class="stat-item"><span class="stat-label">最大并发</span><span class="stat-value">${options.config?.maxConcurrent ?? 'N/A'}</span></div>
@@ -221,7 +234,7 @@ th{background:#667eea;color:white}
       <div class="stat-item"><span class="stat-label">max_tokens</span><span class="stat-value">${options.config?.maxTokens ?? 'N/A'}</span></div>
       <div class="stat-item"><span class="stat-label">temperature</span><span class="stat-value">${options.config?.temperature ?? 'N/A'}</span></div>
       <div class="stat-item"><span class="stat-label">超时配置</span><span class="stat-value">连接${options.config?.connectTimeout ?? 100}s / 读取${options.config?.readTimeout ?? 180}s / 总${options.config?.totalTimeout ?? 300}s</span></div>
-      <div class="stat-item"><span class="stat-label">实际耗时</span><span class="stat-value">${stats.endTime && stats.startTime ? (stats.endTime - stats.startTime).toFixed(1) : 'N/A'} 秒</span></div>
+        <div class="stat-item"><span class="stat-label">实际耗时</span><span class="stat-value">${stats.endTime && stats.startTime ? (stats.endTime - stats.startTime).toFixed(1) : 'N/A'} 秒</span></div>
     </div>
   </div>
 </div>
@@ -232,5 +245,7 @@ th{background:#667eea;color:white}
 
   mkdirSync(dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, html, 'utf-8');
-  console.log(`报告已生成: ${outputPath}`);
+  if (!options?.silent) {
+    console.log(`报告已生成: ${outputPath}`);
+  }
 }

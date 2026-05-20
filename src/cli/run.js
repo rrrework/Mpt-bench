@@ -26,8 +26,50 @@ export async function fetchModels(channel) {
   }
 }
 
-export async function runCommand(cmdOptions) {
-  const config = loadConfig(cmdOptions.config);
+export function loadDatasetWithMeta(resolvedDatasetPath) {
+  const raw = JSON.parse(readFileSync(resolvedDatasetPath, 'utf-8'));
+
+  if (Array.isArray(raw)) {
+    const items = raw
+      .map(item => (typeof item === 'string' ? item : item?.content))
+      .filter(Boolean);
+    return { items, meta: {}, path: resolvedDatasetPath };
+  }
+
+  if (raw && typeof raw === 'object' && Array.isArray(raw.items)) {
+    const items = raw.items
+      .map(item => (typeof item === 'string' ? item : item?.content))
+      .filter(Boolean);
+    return { items, meta: raw.meta || {}, path: resolvedDatasetPath };
+  }
+
+  throw new Error('数据集格式不支持：需要数组格式或 { meta, items } 格式');
+}
+
+export function resolveScenario(cmdOptions, datasetMeta, datasetPath) {
+  if (cmdOptions.scenario) return cmdOptions.scenario;
+  if (datasetMeta?.scenario) return datasetMeta.scenario;
+
+  const lower = (datasetPath || '').toLowerCase();
+  if (lower.includes('long-summary') || lower.includes('long_summary')) return 'long-summary';
+  if (lower.includes('short')) return 'short';
+  return 'default';
+}
+
+export async function runCommand(cmdOptions, deps = {}) {
+  const loadConfigFn = deps.loadConfig || loadConfig;
+  const getChannelFn = deps.getChannel || getChannel;
+  const getEnabledChannelsFn = deps.getEnabledChannels || getEnabledChannels;
+  const getDefaultDatasetPathFn = deps.getDefaultDatasetPath || getDefaultDatasetPath;
+  const getResultsDirFn = deps.getResultsDir || getResultsDir;
+  const runSchedulerFn = deps.runScheduler || runScheduler;
+  const generateHtmlReportFn = deps.generateHtmlReport || generateHtmlReport;
+  const errorLoggerInstance = deps.errorLogger || errorLogger;
+  const emit = deps.emit || console.log;
+  const isJsonMode = cmdOptions.format === 'json';
+  const log = isJsonMode ? (() => {}) : emit;
+
+  const config = loadConfigFn(cmdOptions.config);
 
   // 合并参数
   const rpm = parseInt(cmdOptions.rpm) || config.defaults.rpm;
@@ -37,15 +79,15 @@ export async function runCommand(cmdOptions) {
   // 确定渠道
   let channels = [];
   if (cmdOptions.all) {
-    channels = getEnabledChannels(config);
+    channels = getEnabledChannelsFn(config);
   } else if (cmdOptions.channel) {
-    const ch = getChannel(config, cmdOptions.channel);
+    const ch = getChannelFn(config, cmdOptions.channel);
     if (!ch) {
       throw new Error(`渠道 "${cmdOptions.channel}" 未找到或未启用`);
     }
     channels = [ch];
   } else {
-    channels = getEnabledChannels(config).slice(0, 1);
+    channels = getEnabledChannelsFn(config).slice(0, 1);
   }
   if (channels.length === 0) {
     throw new Error('没有可用的渠道。请先通过菜单选项4添加并启用渠道。');
@@ -55,7 +97,7 @@ export async function runCommand(cmdOptions) {
   const datasetPath = cmdOptions.dataset || '';
   const candidates = datasetPath
     ? [datasetPath, resolve(getDatasetsDir(), datasetPath)]
-    : [getDefaultDatasetPath()];
+    : [getDefaultDatasetPathFn()];
   let resolvedDatasetPath = null;
   for (const p of candidates) {
     if (existsSync(p)) { resolvedDatasetPath = p; break; }
@@ -66,15 +108,18 @@ export async function runCommand(cmdOptions) {
       `提示: 请先运行「菜单选项5」生成数据集，或使用 --dataset 指定路径`,
     );
   }
-  const raw = JSON.parse(readFileSync(resolvedDatasetPath, 'utf-8'));
-  const dataset = raw.map(item => (typeof item === 'string' ? item : item.content)).filter(Boolean);
+  const loaded = loadDatasetWithMeta(resolvedDatasetPath);
+  const dataset = loaded.items;
+  const datasetMeta = loaded.meta || {};
+  const scenario = resolveScenario(cmdOptions, datasetMeta, resolvedDatasetPath);
   if (dataset.length === 0) {
     throw new Error('数据集为空');
   }
-  console.log(`加载数据集: ${dataset.length} 条 Prompt (${resolvedDatasetPath})`);
+  log(`加载数据集: ${dataset.length} 条 Prompt (${resolvedDatasetPath})`);
+  log(`场景: ${scenario}`);
 
   // 报告输出目录
-  const outputDir = getResultsDir();
+  const outputDir = cmdOptions.output ? resolve(cmdOptions.output) : getResultsDirFn();
   mkdirSync(outputDir, { recursive: true });
 
   const results = [];
@@ -99,42 +144,50 @@ export async function runCommand(cmdOptions) {
       secondThreshold: config.defaults?.second_threshold || 600,
     };
 
-    console.log(`\n========================================`);
-    console.log(`[${effectiveChannel.name}] 开始压测 RPM=${rpm} Duration=${duration}s`);
-    console.log(`========================================\n`);
+    log(`\n========================================`);
+    log(`[${effectiveChannel.name}] 开始压测 RPM=${rpm} Duration=${duration}s`);
+    log(`========================================\n`);
 
     // 初始化错误日志
-    errorLogger.init(effectiveChannel.name);
+    errorLoggerInstance.init(effectiveChannel.name);
 
-    await runScheduler(effectiveChannel, dataset, stats, mergedOptions);
+    await runSchedulerFn(effectiveChannel, dataset, stats, mergedOptions);
 
     // 关闭错误日志
-    errorLogger.close();
+    errorLoggerInstance.close();
 
-    console.log(`\n========================================`);
-    console.log(`压测完成: ${effectiveChannel.name}`);
-    console.log(`总请求: ${stats.getTotalRequests()}, 成功: ${stats.successCount}, 失败: ${stats.failureCount}`);
-    console.log(`成功率: ${stats.getSuccessRate().toFixed(2)}%`);
-    console.log(`实际 RPM: ${stats.getActualRpm().toFixed(1)} / ${rpm}`);
+    log(`\n========================================`);
+    log(`压测完成: ${effectiveChannel.name}`);
+    log(`总请求: ${stats.getTotalRequests()}, 成功: ${stats.successCount}, 失败: ${stats.failureCount}`);
+    log(`成功率: ${stats.getSuccessRate().toFixed(2)}%`);
+    log(`实际 RPM: ${stats.getActualRpm().toFixed(1)} / ${rpm}`);
     const respArr = stats.responseTimes;
     if (respArr.length > 0) {
       const sorted = [...respArr].sort((a, b) => a - b);
       const avg = respArr.reduce((a, b) => a + b, 0) / respArr.length * 1000;
       const p95 = sorted[Math.floor(sorted.length * 0.95)] * 1000;
-      console.log(`平均响应: ${avg.toFixed(0)}ms, P95: ${p95.toFixed(0)}ms`);
+      log(`平均响应: ${avg.toFixed(0)}ms, P95: ${p95.toFixed(0)}ms`);
     }
     if (stats.ttftTimes.length > 0) {
-      console.log(`平均 TTFT: ${(stats.ttftTimes.reduce((a, b) => a + b, 0) / stats.ttftTimes.length * 1000).toFixed(0)}ms`);
+      log(`平均 TTFT: ${(stats.ttftTimes.reduce((a, b) => a + b, 0) / stats.ttftTimes.length * 1000).toFixed(0)}ms`);
     }
-    console.log(`输出 TPS: ${stats.getCompletionTps().toFixed(1)} tokens/s`);
+    log(`输出 TPS: ${stats.getCompletionTps().toFixed(1)} tokens/s`);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const safeName = effectiveChannel.name.replace(/[\/\\:*?"<>|]/g, '_');
-    const reportFile = `${safeName}_${timestamp}_report.html`;
+    const safeScenario = (scenario || 'default').replace(/[\/\\:*?"<>|]/g, '_');
+    const reportFile = `${safeName}_${safeScenario}_${timestamp}_report.html`;
     const reportPath = resolve(outputDir, reportFile);
-    generateHtmlReport(stats, {
+    generateHtmlReportFn(stats, {
       modelName: effectiveChannel.name,
       targetRpm: rpm,
       duration,
+      scenario,
+      dataset: {
+        path: resolvedDatasetPath,
+        count: dataset.length,
+        corpus: datasetMeta?.corpus || null,
+      },
+      silent: isJsonMode,
       config: {
         maxConcurrent,
         connectTimeout: mergedOptions.connectTimeout,
@@ -144,12 +197,13 @@ export async function runCommand(cmdOptions) {
         temperature: mergedOptions.temperature,
       },
     }, reportPath);
-    console.log(`报告: ${reportPath}`);
-    console.log(`========================================`);
+    log(`报告: ${reportPath}`);
+    log(`========================================`);
 
     results.push({
-      channel: channel.name,
-      model: channel.model,
+      channel: effectiveChannel.name,
+      model: effectiveChannel.model,
+      scenario,
       totalRequests: stats.getTotalRequests(),
       successRate: stats.getSuccessRate(),
       actualRpm: stats.getActualRpm(),
@@ -159,6 +213,6 @@ export async function runCommand(cmdOptions) {
   }
 
   if (cmdOptions.format === 'json') {
-    console.log(JSON.stringify(results, null, 2));
+    emit(JSON.stringify(results, null, 2));
   }
 }

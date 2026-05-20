@@ -1,4 +1,9 @@
-import { writeFileSync } from 'fs';
+import {
+  BUILTIN_CORPUS_NAME,
+  loadCorpus,
+  resolveCorpusPath,
+  sliceCorpusRandomly,
+} from './corpus.js';
 
 // 行业领域
 const INDUSTRIES = ['金融科技', '医疗健康', '智能制造', '自动驾驶', '电子商务', '在线教育', '新能源', '半导体', '航空航天', '智慧农业', '元宇宙', '网络安全', '物流供应链'];
@@ -149,28 +154,104 @@ ${generateListFrom(cluster.solutions, 4, 6, SOLUTION_SUFFIXES)}
 要求：专业深入，逻辑严谨，总字数不少于3000字。`;
 }
 
-export function generateDataset({ count = 100, sizeKb = 10, output = 'default.json' } = {}) {
-  const dataset = [];
-  const targetBytes = sizeKb * 1024;
+const SHORT_PROMPTS = [
+  '你好。',
+  '请用一句话解释什么是人工智能。',
+  '1+1 等于几？',
+  '北京是中国首都吗？请回答是或否。',
+  '把“项目延期了”改成更委婉的说法。',
+  '“今天天气很好”是积极还是消极？',
+  '请把“我今天有点忙”改写得更礼貌。',
+  '请给出一个 5 字以内的会议标题。',
+  '用一句话总结“机器学习”。',
+  '请把“收到”改成更正式表达。',
+  '你是谁？请用一句话回答。',
+  '请把“明天开会”翻译成英文。',
+];
+
+const LONG_SUMMARY_INSTRUCTIONS = [
+  '请对以上内容进行综述，并提炼关键观点。',
+  '请总结以上文本的核心信息、结构脉络和重点结论。',
+  '请提炼以上内容中的关键信息，并给出简明总结。',
+  '请用不超过500字概括以上文本的主要论点和支撑论据。',
+  '请从技术视角分析以上内容的核心观点，并评估其可行性。',
+  '请梳理以上文本的逻辑结构，归纳各段主旨，给出整体摘要。',
+  '请提取以上内容中的专业术语和核心概念，并逐一简要解释。',
+  '请比较以上文本中提到的不同技术方案，分析各自优劣。',
+  '请就以上内容的观点展开评述，指出其创新性和局限性。',
+  '请将以上内容改写为面向决策者的执行摘要，突出行动建议。',
+  'Summarize the above content in a structured format with key takeaways.',
+  'Provide a critical analysis of the main arguments presented above.',
+  'Extract the key technical concepts and explain their significance.',
+];
+
+function pickShortPrompt() {
+  return pickOne(SHORT_PROMPTS);
+}
+
+function generateDefaultItems(count) {
+  const items = [];
+  for (let i = 0; i < count; i++) {
+    items.push({ content: generateSinglePrompt() });
+  }
+  return items;
+}
+
+function generateShortItems(count) {
+  const items = [];
+  for (let i = 0; i < count; i++) {
+    items.push({ content: pickShortPrompt() });
+  }
+  return items;
+}
+
+function generateLongSummaryItems(count, targetKb, corpusPathInput) {
+  const targetBytes = Math.max(1, targetKb) * 1024;
+  const resolvedCorpusPath = resolveCorpusPath(corpusPathInput);
+  const corpusText = loadCorpus(resolvedCorpusPath);
+  const items = [];
 
   for (let i = 0; i < count; i++) {
-    const prompt = generateSinglePrompt();
-    // 不再暴力填充——单次生成即足够大（约3-6KB）
-    // 如果需要更大的 prompt，用户可以增大 sizeKb，但不再循环堆砌
-    dataset.push(prompt);
-    if ((i + 1) % 50 === 0 || i === count - 1) {
-      const avg = dataset.reduce((s, p) => s + Buffer.byteLength(p, 'utf-8'), 0) / dataset.length / 1024;
-      console.log(`已生成 ${i + 1}/${count} 条，平均大小: ${avg.toFixed(2)} KB`);
-    }
+    const body = sliceCorpusRandomly(corpusText, targetBytes);
+    const instruction = pickOne(LONG_SUMMARY_INSTRUCTIONS);
+    items.push({ content: `${body}\n\n${instruction}` });
   }
 
-  writeFileSync(output, JSON.stringify(dataset, null, 2), 'utf-8');
-  const sizeMb = Buffer.byteLength(JSON.stringify(dataset), 'utf-8') / (1024 * 1024);
-  const avgKb = dataset.reduce((s, p) => s + Buffer.byteLength(p, 'utf-8'), 0) / dataset.length / 1024;
-  console.log(`\n✅ 数据集生成完成！`);
-  console.log(`文件: ${output}`);
-  console.log(`条数: ${dataset.length}`);
-  console.log(`平均大小: ${avgKb.toFixed(2)} KB/条`);
-  console.log(`总大小: ${sizeMb.toFixed(2)} MB`);
-  return dataset;
+  return {
+    items,
+    corpusMeta: corpusPathInput || BUILTIN_CORPUS_NAME,
+  };
+}
+
+export function generateDataset(options = {}) {
+  const preset = options.preset || 'default';
+  const count = Number.parseInt(options.count, 10) || 100;
+  const targetKb = Number.parseInt(options.targetKb ?? options.sizeKb, 10) || 10;
+
+  let items = [];
+  let corpusMeta = null;
+
+  if (preset === 'default') {
+    items = generateDefaultItems(count);
+  } else if (preset === 'short') {
+    items = generateShortItems(count);
+  } else if (preset === 'long-summary') {
+    const generated = generateLongSummaryItems(count, targetKb, options.corpus || null);
+    items = generated.items;
+    corpusMeta = generated.corpusMeta;
+  } else {
+    throw new Error(`不支持的数据集预设: ${preset}`);
+  }
+
+  return {
+    meta: {
+      preset,
+      scenario: preset,
+      corpus: corpusMeta,
+      target_kb: targetKb,
+      count,
+      generated_at: new Date().toISOString(),
+    },
+    items,
+  };
 }

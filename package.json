@@ -11,7 +11,7 @@
     "start": "node bin/mpt.js",
     "dev": "node --watch bin/mpt.js",
     "run": "node bin/mpt.js run",
-    "test": "echo \"Tests pending\" && exit 0"
+    "test": "node --test"
   },
   "keywords": [
     "llm",

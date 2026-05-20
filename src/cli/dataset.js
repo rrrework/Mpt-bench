@@ -8,14 +8,24 @@ export async function datasetGen(options) {
   mkdirSync(datasetsDir, { recursive: true });
   const outputName = options.output || 'default.json';
   const outputPath = resolve(datasetsDir, outputName);
+  mkdirSync(dirname(outputPath), { recursive: true });
 
-  await gen({
-    count: parseInt(options.count) || 100,
-    sizeKb: parseInt(options.sizeKb) || 10,
-    output: outputPath,
+  const preset = options.preset || 'default';
+  const targetKb = parseInt(options.targetKb || options.sizeKb, 10) || 10;
+  const count = parseInt(options.count, 10) || 100;
+
+  const dataset = gen({
+    preset,
+    count,
+    targetKb,
+    sizeKb: targetKb,
+    corpus: options.corpus || null,
   });
 
+  writeFileSync(outputPath, JSON.stringify(dataset, null, 2), 'utf-8');
+
   console.log(`\n数据集已保存到: ${outputPath}`);
+  console.log(`preset=${preset}, count=${count}, targetKb=${targetKb}${dataset.meta?.corpus ? `, corpus=${dataset.meta.corpus}` : ''}`);
   console.log(`后续压测将自动使用此数据集`);
 }
 
@@ -25,7 +35,23 @@ export function datasetImport(options) {
     throw new Error(`文件不存在: ${filePath}`);
   }
   const text = readFileSync(filePath, 'utf-8');
-  const prompts = text.split('\n').filter(line => line.trim());
+  let prompts = null;
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      prompts = parsed.map(item => (typeof item === 'string' ? item : item?.content)).filter(Boolean);
+    } else if (parsed && Array.isArray(parsed.items)) {
+      prompts = parsed.items.map(item => (typeof item === 'string' ? item : item?.content)).filter(Boolean);
+    }
+  } catch {
+    // fallback to plain text lines
+  }
+
+  if (!prompts) {
+    prompts = text.split('\n').filter(line => line.trim());
+  }
+
   if (prompts.length === 0) {
     throw new Error('文件内容为空');
   }
