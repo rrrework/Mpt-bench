@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 
 /**
  * mpt benchmark — 模型横评 CLI 版本
- * 用法: mpt benchmark --channel SHENYUAN --models t_wz_deepseek-v4-pro,t_wz_glm-5 --rpm 30 --duration 60
+ * 用法: mpt benchmark --channel MY_CHANNEL --models model-a,model-b --rpm 30 --duration 60
  *       省略 --models 则自动拉取所有可用模型
  */
 export async function benchmarkCommand(opts) {

@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 
 /**
  * mpt models — 拉取渠道的可用模型列表
- * 用法: mpt models --channel SHENYUAN
+ * 用法: mpt models --channel MY_CHANNEL
  */
 export async function modelsCommand(opts) {
   const config = loadConfig(opts.config);

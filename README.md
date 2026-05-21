@@ -68,3 +68,8 @@ HTML 报告已包含：
 npx mpt run -h
 npx mpt dataset gen -h
 ```
+
+## 开源隐私约定
+
+- 文档与帮助示例统一使用通用占位符（如 `MY_CHANNEL`、`model-a`），不使用组织内部命名。
+- 不在仓库中提交任何真实密钥、账号令牌或本机绝对路径。

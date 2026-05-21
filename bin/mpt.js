@@ -182,10 +182,10 @@ program.command('run')
   npx mpt run
 
   # 指定渠道和参数
-  npx mpt run --channel SHENYUAN --rpm 30 --duration 60 --concurrent 50
+  npx mpt run --channel MY_CHANNEL --rpm 30 --duration 60 --concurrent 50
 
   # 覆盖模型ID（不修改配置文件）
-  npx mpt run --channel SHENYUAN --model t_wz_glm-5 --rpm 20 --duration 30
+  npx mpt run --channel MY_CHANNEL --model t_wz_glm-5 --rpm 20 --duration 30
 
   # 指定数据集
   npx mpt run --dataset my_prompts.json --rpm 60
@@ -251,10 +251,10 @@ program.command('benchmark')
 ═══ 使用示例 ═══
 
   # 指定模型列表
-  npx mpt benchmark --channel SHENYUAN --models t_wz_deepseek-v4-pro,t_wz_glm-5,t_wz_glm-5.1 --rpm 30 --duration 60
+  npx mpt benchmark --channel MY_CHANNEL --models model-a,model-b,model-c --rpm 30 --duration 60
 
   # 自动拉取全部可用模型（需渠道支持 /v1/models 端点）
-  npx mpt benchmark --channel SHENYUAN --rpm 20 --duration 30
+  npx mpt benchmark --channel MY_CHANNEL --rpm 20 --duration 30
 `)
   .action(async (opts) => {
     const { benchmarkCommand } = await import('../src/cli/benchmark.js');
@@ -284,7 +284,7 @@ program.command('models')
 
 ═══ 使用示例 ═══
 
-  npx mpt models --channel SHENYUAN
+  npx mpt models --channel MY_CHANNEL
 `)
   .action(async (opts) => {
     const { modelsCommand } = await import('../src/cli/models.js');
@@ -326,16 +326,16 @@ program.command('tool-test')
 ═══ 使用示例 ═══
 
   # 快速验证
-  npx mpt tool-test --channel SHENYUAN --mode all
+  npx mpt tool-test --channel MY_CHANNEL --mode all
 
   # 简单验证 100 次（对齐 Python 参考）
-  npx mpt tool-test --channel SHENYUAN --mode simple --simple-iters 100
+  npx mpt tool-test --channel MY_CHANNEL --mode simple --simple-iters 100
 
   # 全模式，不同迭代次数
-  npx mpt tool-test --channel SHENYUAN --mode all --simple-iters 50 --multi-iters 30 --boundary-iters 10
+  npx mpt tool-test --channel MY_CHANNEL --mode all --simple-iters 50 --multi-iters 30 --boundary-iters 10
 
   # 边界测试，指定模型
-  npx mpt tool-test --channel SHENYUAN --mode boundary --boundary-iters 20 --model t_wz_glm-5
+  npx mpt tool-test --channel MY_CHANNEL --mode boundary --boundary-iters 20 --model t_wz_glm-5
 `)
   .action(async (opts) => {
     const { toolTestCommand } = await import('../src/cli/tooltest.js');
