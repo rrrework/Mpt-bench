@@ -71,6 +71,9 @@ test('runCommand should honor output dir and keep json stdout machine-safe', asy
         generatedPath = reportPath;
         writeFileSync(reportPath, '<html></html>', 'utf-8');
       },
+      generateXlsxReport: (stats, options, xlsxPath) => {
+        writeFileSync(xlsxPath, Buffer.from('fake xlsx'), 'utf-8');
+      },
       errorLogger: { init() {}, close() {} },
       emit: msg => emitted.push(String(msg)),
     });
