@@ -1,5 +1,6 @@
 const MAX_DEQUE = 100000;
 const MAX_ERRORS = 1000;
+const MAX_REQUESTS = 50000;
 
 export class StatsCollector {
   constructor() {
@@ -10,6 +11,7 @@ export class StatsCollector {
     this.sentTimestamps = [];
     this.errorMessages = [];
     this.errorCodes = new Map();
+    this.requests = [];
     this.connectTimeoutErrors = 0;
     this.readTimeoutErrors = 0;
     this.totalTimeoutErrors = 0;
@@ -62,6 +64,14 @@ export class StatsCollector {
       (this.completionTokensBySecond[secondKey] || 0) + completionTokens;
     this.promptTokensBySecond[secondKey] =
       (this.promptTokensBySecond[secondKey] || 0) + promptTokens;
+
+    if (this.requests.length < MAX_REQUESTS) {
+      this.requests.push({
+        requestId, status: 'SUCCESS', elapsed: elapsed * 1000,
+        ttft: ttft !== null ? ttft * 1000 : null,
+        promptTokens, completionTokens, totalTokens, httpStatus: 200,
+      });
+    }
   }
 
   addFailure(elapsed, sendTimestamp, requestId, errorType, errorMsg, statusCode = null, responseBody = null, xRequestId = null) {
@@ -89,6 +99,14 @@ export class StatsCollector {
     else if (errorType === 'TOTAL_TIMEOUT') this.totalTimeoutErrors++;
     else if (String(errorType).toLowerCase().includes('timeout')) { /* generic timeout */ }
     else if (String(errorType).toLowerCase().includes('connection')) this.connectionErrors++;
+
+    if (this.requests.length < MAX_REQUESTS) {
+      this.requests.push({
+        requestId, status: 'FAILED', elapsed: elapsed * 1000,
+        ttft: null, promptTokens: 0, completionTokens: 0, totalTokens: 0,
+        httpStatus: statusCode || null, errorType, errorMsg: msg,
+      });
+    }
   }
 
   getTotalRequests() {

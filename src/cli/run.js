@@ -5,6 +5,7 @@ import { getDatasetsDir, getResultsDir, getDefaultDatasetPath } from '../utils/w
 import { runScheduler } from '../engine/scheduler.js';
 import { StatsCollector } from '../engine/stats.js';
 import { generateHtmlReport } from '../reporter/html.js';
+import { generateXlsxReport } from '../reporter/xlsx.js';
 import { errorLogger } from '../utils/logger.js';
 
 /**
@@ -177,7 +178,7 @@ export async function runCommand(cmdOptions, deps = {}) {
     const safeScenario = (scenario || 'default').replace(/[\/\\:*?"<>|]/g, '_');
     const reportFile = `${safeName}_${safeScenario}_${timestamp}_report.html`;
     const reportPath = resolve(outputDir, reportFile);
-    generateHtmlReportFn(stats, {
+    const reportOptions = {
       modelName: effectiveChannel.name,
       targetRpm: rpm,
       duration,
@@ -196,8 +197,19 @@ export async function runCommand(cmdOptions, deps = {}) {
         maxTokens: mergedOptions.maxTokens,
         temperature: mergedOptions.temperature,
       },
-    }, reportPath);
+      apiUrl: channel.base_url || channel.baseUrl || 'N/A',
+      timestamp: new Date().toISOString(),
+      scheduleMode: mergedOptions.scheduleMode,
+      stream: config.request?.stream ?? true,
+    };
+    generateHtmlReportFn(stats, reportOptions, reportPath);
+
+    const xlsxFile = reportFile.replace('_report.html', '_report.xlsx');
+    const xlsxPath = resolve(outputDir, xlsxFile);
+    generateXlsxReport(stats, reportOptions, xlsxPath);
+
     log(`报告: ${reportPath}`);
+    log(`报告: ${xlsxPath}`);
     log(`========================================`);
 
     results.push({
@@ -209,6 +221,7 @@ export async function runCommand(cmdOptions, deps = {}) {
       actualRpm: stats.getActualRpm(),
       completionTps: stats.getCompletionTps(),
       report: reportPath,
+      xlsx: xlsxPath,
     });
   }
 
